@@ -27,8 +27,8 @@
 
       // Generic command for adding/editing entities of all types.
       editor.addCommand('editdrupalentity', {
-        allowedContent: 'drupal-entity[data-entity-type,data-entity-id,data-entity-uuid,data-entity-embed-display,data-entity-embed-settings,data-align,data-caption]',
-        requiredContent: 'drupal-entity[data-entity-type,data-entity-id,data-entity-uuid,data-entity-embed-display,data-entity-embed-settings,data-align,data-caption]',
+        allowedContent: 'drupal-entity[*]',
+        requiredContent: 'drupal-entity[*]',
         modes: { wysiwyg : 1 },
         canUndo: true,
         exec: function (editor, data) {
@@ -67,7 +67,6 @@
             for (var key in attributes) {
               entityElement.setAttribute(key, attributes[key]);
             }
-
             editor.insertHtml(entityElement.getOuterHtml());
             if (existingElement) {
               // Detach the behaviors that were attached when the entity content
@@ -78,15 +77,15 @@
           };
 
           // Open the entity embed dialog for corresponding EmbedButton.
-          Drupal.entityEmbed.openDialog(editor, Drupal.settings.basePath + 'entity-embed/dialog/entity-embed/' + editor.config.drupal.format + '/' + embed_button_id + '?_format=drupal_dialog', existingValues, saveCallback, dialogSettings);
+          Drupal.entityEmbed.openDialog(editor, Drupal.settings.basePath + 'entity-embed/dialog/entity-embed/' + Drupal.settings.ckeditor.elements[editor.name] + '/' + embed_button_id + '?_format=drupal_dialog', existingValues, saveCallback, dialogSettings);
         }
       });
 
       // Register the entity embed widget.
       editor.widgets.add('drupalentity', {
         // Minimum HTML which is required by this widget to work.
-        allowedContent: 'drupal-entity[data-entity-type,data-entity-id,data-entity-uuid,data-entity-embed-display,data-entity-embed-settings,data-align,data-caption]',
-        requiredContent: 'drupal-entity[data-entity-type,data-entity-id,data-entity-uuid,data-entity-embed-display,data-entity-embed-settings,data-align,data-caption]',
+        allowedContent: 'drupal-entity[*]',
+        requiredContent: 'drupal-entity[*]',
 
         // Simply recognize the element as our own. The inner markup if fetched
         // and inserted the init() callback, since it requires the actual DOM
@@ -109,7 +108,7 @@
           // Use the Ajax framework to fetch the HTML, so that we can retrieve
           // out-of-band assets (JS, CSS...).
           new Drupal.ajax($element.attr('id'), $element, {
-            url: Drupal.settings.basePath + 'entity-embed/preview/' + editor.config.drupal.format + '?' + $.param({
+            url: Drupal.settings.basePath + 'entity-embed/preview/' + Drupal.settings.ckeditor.elements[editor.name] + '?' + $.param({
               value: element.getOuterHtml()
             }),
             progress: {type: 'none'},
@@ -133,8 +132,8 @@
 
       // Register the toolbar buttons.
       if (editor.ui.addButton) {
-        for (var key in Drupal.settings.editor.formats[editor.config.drupal.format].filterSettings.DrupalEntity_buttons) {
-          var button = Drupal.settings.editor.formats[editor.config.drupal.format].filterSettings.DrupalEntity_buttons[key];
+        for (var key in Drupal.settings.entity_embed.DrupalEntity_buttons) {
+          var button = Drupal.settings.entity_embed.DrupalEntity_buttons[key];
           editor.ui.addButton(button.id, {
             label: button.label,
             data: button,

@@ -36,10 +36,6 @@ function entityreference_prepopulate_field_create_instance($instance) {
   if (empty($instance['settings']['behaviors']['prepopulate']['status'])) {
     return;
   }
-  // If a default value function has already been set, don't overwrite it.
-  if (!empty($instance['default_value_function'])) {
-    return;
-  }
 
   $instance['default_value_function'] = 'entityreference_prepopulate_field_default_value';
   field_update_instance($instance);
@@ -50,10 +46,6 @@ function entityreference_prepopulate_field_create_instance($instance) {
  */
 function entityreference_prepopulate_field_update_instance($instance, $prior_instance) {
   if (empty($instance['settings']['behaviors']['prepopulate'])) {
-    return;
-  }
-  // If a default value function has already been set, don't overwrite it.
-  if (!empty($instance['default_value_function'])) {
     return;
   }
   if (isset($prior_instance['settings']['behaviors']['prepopulate']['status']) && $instance['settings']['behaviors']['prepopulate']['status'] == $prior_instance['settings']['behaviors']['prepopulate']['status']) {
@@ -306,10 +298,13 @@ function entityreference_prepopulate_get_values($field, $instance, $validate = T
   }
 
   $handler = entityreference_get_selection_handler($field, $instance);
-  if (!$ids = $handler->validateReferencableEntities($ids)) {
+  if (!$valid_ids = $handler->validateReferencableEntities($ids)) {
     $cache[$identifier] = FALSE;
     return;
   }
+
+  // Only include valid ids.
+  $ids = array_intersect($ids, $valid_ids);
 
   // Check access to the provided entities.
   $target_type = $field['settings']['target_type'];

@@ -11,6 +11,9 @@ require_once dirname(__FILE__) . '/includes/entity_embed.html.inc';
 // AJAX commands.
 require_once dirname(__FILE__) . '/includes/entity_embed.commands.inc';
 
+// File usage tracking.
+require_once dirname(__FILE__) . '/includes/entity_embed.file_usage.inc';
+
 // Display functions.
 require_once dirname(__FILE__) . '/includes/entity_embed.display.inc';
 
@@ -78,13 +81,13 @@ function entity_embed_help($path, $arg) {
       $output .= '<li>' . t('Configure the jQuery Update module to use jQuery 1.7 or higher by visiting the <a href="@jquery_update">jQuery Update configuration page</a>.', array('@jquery_update' => url('admin/config/development/jquery_update'))) . '</li>';
       $output .= '<li>' . t('Enable the entity-embed filter <em>Display embedded entities</em> for the desired text formats from the <a href="@filter">Text Formats configuration page</a>.', array('@filter' => url('admin/config/content/formats'))) . '</li>';
       $output .= '<li>' . t('If the <em>Limit allowed HTML tags</em> filter is enabled, add <code>&lt;drupal-entity&gt;</code> to the <em>Allowed HTML tags</em>') . '</li>';
-      $output .= '<li>' . t('Optionally enable the editor-align filter <em>Align images</em> to allow positioning of embedded entities.') . '</li>';
-      $output .= '<li>' . t('To enable the WYSIWYG plugin, move the entity-embed <code>E</code> button into the Active toolbar for the desired text formats from the <a href="@formats">text formats configuration page</a>.', array('@formats' => url('admin/config/content/formats'))) . '</li>';
+      $output .= '<li>' . t('Optionally enable the filter-align filter <em>Align embedded entities</em> to allow positioning of embedded entities.') . '</li>';
+      $output .= '<li>' . t('To enable the WYSIWYG plugin, move the entity-embed <code>E</code> button into the Active toolbar for the desired text formats from the <a href="@ckeditor">CKEditor configuration page</a>.', array('@ckeditor' => url('admin/config/content/ckeditor'))) . '</li>';
       $output .= '</ol>';
       return $output;
 
     case 'admin/config/content/embed-button':
-      return '<p>' . t("Embed buttons define the buttons that can be added to CKEditor's toolbar. All buttons correspond to the selcted entity type, although a particular entity type can have more than one button. After you've created the desired buttons, go to <a href='@formats'>text formats configuration</a> page to add them to CKEditor's toolbar for the desired text formats.", array('@formats' => url('admin/config/content/formats'))) . '</p>';
+      return '<p>' . t("Embed buttons define the buttons that can be added to CKEditor's toolbar. All buttons correspond to the selcted entity type, although a particular entity type can have more than one button. After you've created the desired buttons, go to <a href='@ckeditor'>CKEditor configuration</a> page to add them to CKEditor's toolbar for the desired text formats.", array('@ckeditor' => url('admin/config/content/ckeditor'))) . '</p>';
   }
 }
 
@@ -304,22 +307,12 @@ function _entity_embed_preview_format_access($format) {
  *   The access result.
  */
 function _entity_embed_button_is_enabled($filter_format, $embed_button) {
-  editor_format_ensure_additional_properties($filter_format);
-
-  if (!editor_load($filter_format->editor)) {
-    return FALSE;
-  }
-
+  module_load_include('inc', 'ckeditor', 'includes/ckeditor.lib');
   $button_name = $embed_button->name;
-
-  if (!empty($filter_format->editor_settings['toolbar'])) {
-    foreach ($filter_format->editor_settings['toolbar'] as $row) {
-      foreach ($row as $button_group) {
-        if (in_array($button_name, $button_group['items'])) {
-          return TRUE;
-        }
-      }
-    }
+  $profile = ckeditor_get_profile($filter_format->format);
+  $settings = $profile->settings;
+  if (strpos($settings['toolbar'], "'" . $button_name . "'")) {
+    return TRUE;
   }
 
   return FALSE;
@@ -413,6 +406,29 @@ function entity_embed_autocomplete_entity($filter_format, $embed_button, $string
   return drupal_json_output($matches);
 }
 
+/** 
+ * Implements hook_library(). 
+ */
+function entity_embed_library() {
+  $libraries['drupal.editor.dialog'] = array(
+    'title' => 'Drupal Editor Dialog',
+    'website' => 'http://www.drupal.org',
+    'version' => VERSION,
+    'js' => array(
+      drupal_get_path('module', 'entity_embed') . '/js/editor/editor.dialog.js' => array(
+        'weight' => 2,
+      ),
+    ),
+    'dependencies' => array(
+      array('system', 'jquery'),
+      array('system', 'drupal.ajax'),
+      array('dialog', 'drupal.dialog'),
+    ),
+  );
+
+  return $libraries;
+}
+
 /**
  * Implements hook_filter_info().
  */
@@ -423,7 +439,13 @@ function entity_embed_filter_info() {
     'process callback' => '_entity_embed_render_placeholders',
     'cache' => FALSE,
     'tips callback' => '_entity_embed_render_placeholders_tips',
-    'js settings callback' => '_entity_embed_entity_embed_js_settings',
+  );
+
+  $filters['filter_align'] = array(
+    'title' => t('Align embedded entities'),
+    'description' => t('Allows embedded entities to be aligned.'),
+    'process callback' => '_entity_embed_filter_align',
+    'tips callback' => '_entity_embed_filter_align_tips',
   );
 
   return $filters;
@@ -446,34 +468,6 @@ function _entity_embed_render_placeholders_tips($filter, $format, $long = FALSE)
   else {
     return t('You can embed entities.');
   }
-}
-
-/**
- * Implements callback_filter_js_settings().
- *
- * Entity Embed JS settings callback: return settings for JavaScript.
- */
-function _entity_embed_entity_embed_js_settings($filter, $format) {
-  // Add user-defined buttons.
-  $embed_buttons = entity_embed_embed_button_load_all();
-
-  $buttons = array();
-
-  foreach ($embed_buttons as $embed_button) {
-    $buttons[$embed_button->name] = array(
-      'id' => check_plain($embed_button->name),
-      'name' => check_plain($embed_button->admin_title),
-      'label' => check_plain($embed_button->admin_title),
-      'entity_type' => check_plain($embed_button->entity_type),
-      'image' => check_plain(_entity_embed_button_image($embed_button->button_icon_fid)),
-    );
-  }
-
-  return array(
-    'DrupalEntity_dialogTitleAdd' => t('Insert entity'),
-    'DrupalEntity_dialogTitleEdit' => t('Edit entity'),
-    'DrupalEntity_buttons' => $buttons,
-  );
 }
 
 /**
@@ -544,6 +538,121 @@ function _entity_embed_render_placeholders($text, $filter, $format, $langcode, $
 }
 
 /**
+ * Implements callback_filter_tips().
+ *
+ * Provides help for the entity embed's align filter.
+ */
+function _entity_embed_filter_align_tips($filter, $format, $long = FALSE) {
+  if ($long) {
+    return t('
+        <p>You can align images, videos, blockquotes and so on to the left, right or center. Examples:</p>
+        <ul>
+          <li>Align an image to the left: <code>&lt;img src="" data-align="left" /&gt;</code></li>
+          <li>Align an image to the center: <code>&lt;img src="" data-align="center" /&gt;</code></li>
+          <li>Align an image to the right: <code>&lt;img src="" data-align="right" /&gt;</code></li>
+          <li>… and you can apply this to other elements as well: <code>&lt;video src="" data-align="center" /&gt;</code></li>
+        </ul>');
+  }
+  else {
+    return t('You can align images (<code>data-align="center"</code>), but also videos, blockquotes, and so on.');
+  }
+}
+
+/**
+ * Implements callback_filter_process().
+ *
+ * Aligns embedded entities.
+ */
+function _entity_embed_filter_align($text) {
+  $result = $text;
+
+  if (stristr($text, 'data-align') !== FALSE) {
+    $dom = entity_embed_dom_load_html($text);
+    $xpath = new \DOMXPath($dom);
+    foreach ($xpath->query('//*[@data-align]') as $node) {
+      // Read the data-align attribute's value, then delete it.
+      $align = $node->getAttribute('data-align');
+      $node->removeAttribute('data-align');
+
+      // If one of the allowed alignments, add the corresponding class.
+      if (in_array($align, array('left', 'center', 'right'))) {
+        $classes = $node->getAttribute('class');
+        $classes = (strlen($classes) > 0) ? explode(' ', $classes) : array();
+        $classes[] = 'align-' . $align;
+        $node->setAttribute('class', implode(' ', $classes));
+      }
+    }
+
+    $result = entity_embed_serialize($dom);
+  }
+
+  return $result;
+}
+
+/**
+ * Implements hook_page_build().
+ */
+function entity_embed_page_build(&$page) {
+  $page['page_bottom']['entity_embed']['#attached']['css'] = array(
+    drupal_get_path('module', 'entity_embed') . '/css/entity_embed.css' => array(
+      'every_page' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_element_info_alter().
+ */
+function entity_embed_element_info_alter(&$types) {
+  $types['text_format']['#pre_render'][] = 'entity_embed_pre_render_text_format';
+}
+
+/**
+ * Process text format elements to load and attach assets.
+ */
+function entity_embed_pre_render_text_format($element) {
+  if (!isset($element['format'])) {
+    return $element;
+  }
+
+  $field = &$element['value'];
+
+  if (!isset($field['#value'])) {
+    return $element;
+  }
+
+  // Add user-defined buttons.
+  $embed_buttons = entity_embed_embed_button_load_all();
+
+  $buttons = array();
+
+  foreach ($embed_buttons as $embed_button) {
+    $buttons[$embed_button->name] = array(
+      'id' => check_plain($embed_button->name),
+      'name' => check_plain($embed_button->name),
+      'label' => check_plain($embed_button->button_label),
+      'entity_type' => check_plain($embed_button->entity_type),
+      'image' => check_plain(_entity_embed_button_image($embed_button->button_icon_fid)),
+    );
+  }
+
+  $element['#attached']['library'][] = array('dialog', 'drupal.dialog.ajax');
+
+  $element['#attached']['js'][] = array(
+    'data' => array(
+      'entity_embed' => array(
+        'DrupalEntity_dialogTitleAdd' => t('Insert entity'),
+        'DrupalEntity_dialogTitleEdit' => t('Edit entity'),
+        'DrupalEntity_buttons' => $buttons,
+      ),
+    ),
+    'type' => 'setting',
+  );
+
+  return $element;
+}
+
+/**
  * Helper function to create a URL to an embed button icon.
  *
  * @param int $fid
@@ -553,15 +662,13 @@ function _entity_embed_render_placeholders($text, $filter, $format, $langcode, $
  *   A string containing a URL that may be used to access the file.
  */
 function _entity_embed_button_image($fid) {
-  $url = file_create_url(drupal_get_path('module', 'entity_embed') . '/js/plugins/drupalentity/entity.png');
-
   if ($fid) {
-    if ($file = file_load($fid)) {
-      $url = file_create_url($file->uri);
-    }
+    $image = file_load($fid);
+    return file_create_url($image->uri);
   }
-
-  return $url;
+  else {
+    return file_create_url(drupal_get_path('module', 'entity_embed') . '/js/plugins/drupalentity/entity.png');
+  }
 }
 
 /**

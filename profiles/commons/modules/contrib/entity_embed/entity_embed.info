@@ -4,10 +4,9 @@ package = Media
 core = 7.x
 
 dependencies[] = ctools
-dependencies[] = editor_ckeditor
+dependencies[] = ckeditor
 dependencies[] = dialog
 dependencies[] = entity
-dependencies[] = entityreference
 dependencies[] = filter
 dependencies[] = jquery_update
 
@@ -21,9 +20,9 @@ files[] = entity_embed.test
 
 configure = admin/config/content/embed-button
 
-
-; Information added by drush on 2016-11-22
-version = ""
+; Information added by Drupal.org packaging script on 2016-01-03
+version = "7.x-2.0-alpha3"
+core = "7.x"
 project = "entity_embed"
-datestamp = "1479776711"
+datestamp = "1451860142"
 

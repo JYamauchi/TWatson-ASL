@@ -25,14 +25,14 @@ function hook_entity_embed_context_alter(&$context, &$callback, $entity) {
 }
 
 /**
- * Alter the context of an particular embedded entity type before it is rendered.
+ * Act on an entity before it is about to be rendered in an embed.
  *
- * @param array &$context
- *   The context array.
  * @param $entity
  *   The entity object.
+ * @param array $context
+ *   The context array.
  */
-function hook_ENTITY_TYPE_embed_context_alter(&$context, $entity) {
+function hook_entity_preembed($entity, $context) {
   if (isset($context['overrides']) && is_array($context['overrides'])) {
     foreach ($context['overrides'] as $key => $value) {
       $entity->key = $value;
@@ -56,23 +56,6 @@ function hook_ENTITY_TYPE_embed_context_alter(&$context, $entity) {
  */
 function hook_entity_embed_alter(&$build, $entity, $context) {
   // Remove the contextual links on all entites that provide them.
-  if (isset($build['#contextual_links'])) {
-    unset($build['#contextual_links']);
-  }
-}
-
-/**
- * Alter the results of the particular embedded entity type build array.
- *
- * @param array &$build
- *   A renderable array representing the embedded entity content.
- * @param $entity
- *   The embedded entity object.
- * @param array $context
- *   The context array.
- */
-function hook_ENTITY_TYPE_embed_alter(&$build, $entity, array &$context) {
-  // Remove the contextual links.
   if (isset($build['#contextual_links'])) {
     unset($build['#contextual_links']);
   }
